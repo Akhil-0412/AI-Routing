@@ -1,4 +1,4 @@
-# LEC AI Inference Router
+# AI Inference Router
 
 > **Assessment submission** — LEC AI Engineering Intern, August 2026
 
