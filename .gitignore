@@ -1,0 +1,40 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# === Build / Distribution ===
+*.egg-info/
+dist/
+build/
+*.egg
+MANIFEST
+
+# === Virtual Environments ===
+.env
+.venv/
+env/
+venv/
+ENV/
+
+# === Test Artifacts ===
+.pytest_cache/
+.coverage
+htmlcov/
+test_results*.txt
+*.log
+
+# === IDEs ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Docker ===
+*.pid

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LEC AI Router — Live Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #050d1a;
+      --surface:     #0b1628;
+      --surface2:    #0f1e36;
+      --border:      #1a2d4a;
+      --border2:     #243d5e;
+      --text:        #cdd9f0;
+      --text-dim:    #5a7099;
+      --text-muted:  #3a5070;
+
+      --teal:        #00c8a0;
+      --teal-dim:    #00c8a022;
+      --amber:       #f59e0b;
+      --amber-dim:   #f59e0b22;
+      --red:         #f43f5e;
+      --red-dim:     #f43f5e22;
+      --blue:        #38bdf8;
+      --blue-dim:    #38bdf822;
+      --purple:      #a855f7;
+      --purple-dim:  #a855f722;
+      --neutral:     #94a3b8;
+      --neutral-dim: #94a3b822;
+      --green:       #4ade80;
+
+      --card-radius: 12px;
+      --row-radius:  6px;
+    }
+
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid background ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ── */
+    .page { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 28px 24px 48px; }
+
+    /* ── Header ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--teal), var(--blue));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text h1 {
+      font-size: 16px; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase; color: #e2ecff;
+    }
+    .logo-text p { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 6px 14px;
+      font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-dim);
+      transition: background 0.4s;
+    }
+    .status-dot.live { background: var(--teal); box-shadow: 0 0 6px var(--teal); animation: pulse 2s infinite; }
+    .status-dot.error { background: var(--red); }
+    @keyframes pulse { 0%,100%{ opacity:1 } 50%{ opacity:0.4 } }
+
+    /* ── Metric cards ── */
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 20px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--card-accent, transparent) 0%, transparent 60%);
+      opacity: 0.06; pointer-events: none;
+    }
+    .card--budget  { --card-accent: var(--teal); }
+    .card--latency { --card-accent: var(--blue); }
+    .card--local   { --card-accent: var(--neutral); }
+    .card--reject  { --card-accent: var(--red); }
+
+    .card-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+      display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+    }
+    .card-label .dot {
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+    .card--budget  .dot { background: var(--teal); }
+    .card--latency .dot { background: var(--blue); }
+    .card--local   .dot { background: var(--neutral); }
+    .card--reject  .dot { background: var(--red); }
+
+    .card-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 28px; font-weight: 500;
+      color: #e8f0ff; letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .card-sub {
+      font-size: 11px; color: var(--text-dim); margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .card-bar { margin-top: 14px; height: 3px; background: var(--border2); border-radius: 99px; overflow: hidden; }
+    .card-bar-fill {
+      height: 100%; border-radius: 99px;
+      background: var(--bar-color, var(--teal));
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text-dim);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .event-count {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 999px; padding: 2px 8px;
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      overflow-y: auto;
+      max-height: 50vh;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--text-dim);
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+      animation: rowIn 0.25s ease both;
+    }
+    @keyframes rowIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td {
+      padding: 11px 16px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      vertical-align: middle;
+    }
+    td.dim { color: var(--text-dim); }
+
+    /* ── Route badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 4px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .badge-LOCAL      { background: var(--blue-dim); color: var(--blue); border: 1px solid #38bdf840; }
+    .badge-REMOTE     { background: var(--purple-dim); color: var(--purple); border: 1px solid #a855f740; }
+    .badge-QUEUE_LOCAL{ background: var(--amber-dim);   color: var(--amber);   border: 1px solid #f59e0b40; }
+    .badge-FAIL_FAST  { background: var(--red-dim);     color: var(--red);     border: 1px solid #f43f5e40; }
+
+    .badge-ok       { background: #4ade8018; color: var(--green);   border: 1px solid #4ade8040; }
+    .badge-warn     { background: var(--amber-dim); color: var(--amber); border: 1px solid #f59e0b40; }
+    .badge-err      { background: var(--red-dim);   color: var(--red);   border: 1px solid #f43f5e40; }
+
+    /* ── Tier chip ── */
+    .tier-FAST    { color: var(--neutral); }
+    .tier-QUALITY { color: var(--teal); }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center; padding: 48px 0;
+      color: var(--text-dim); font-size: 13px;
+    }
+    .empty span { display: block; font-size: 28px; margin-bottom: 10px; opacity: 0.4; }
+
+    /* ── Run Catalogue ── */
+    .run-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+      animation: rowIn 0.25s ease both;
+    }
+    .run-header {
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+      background: var(--surface);
+      transition: background 0.15s;
+    }
+    .run-header:hover {
+      background: var(--surface2);
+    }
+    .run-header-title {
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .run-header-stats {
+      display: flex;
+      gap: 24px;
+      color: var(--text-dim);
+    }
+    .run-header-stats span { display: flex; align-items: center; gap: 6px; }
+    .run-header-stats strong { color: var(--text); font-weight: 500; }
+    
+    .run-details {
+      border-top: 1px solid var(--border);
+      background: var(--surface2);
+      padding: 20px;
+      display: none;
+    }
+    .run-details.expanded {
+      display: block;
+    }
+    .run-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .run-metric {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .run-metric-label {
+      font-size: 10px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px;
+    }
+    .run-metric-value {
+      font-size: 14px; font-family: 'JetBrains Mono', monospace; color: var(--text); font-weight: 500;
+    }
+    .toggle-events-btn {
+      background: var(--border);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      transition: background 0.15s;
+    }
+    .toggle-events-btn:hover { background: var(--border2); }
+    .run-events {
+      margin-top: 16px;
+      display: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+    .run-events.expanded { display: block; }
+    .run-events table { background: var(--bg); }
+    .run-events th { background: var(--surface); }
+
+    /* ── Rollback row flash ── */
+
+    .row-rollback { background: var(--red-dim) !important; }
+
+    /* responsive */
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 540px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">
+        <h1>LEC AI Router</h1>
+        <p>Live Observability Dashboard — read-only</p>
+      </div>
+    </div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- ── Metric cards ── -->
+  <div class="cards">
+
+    <div class="card card--budget">
+      <div class="card-label"><span class="dot"></span>Budget Remaining</div>
+      <div class="card-value" id="mBudget">—</div>
+      <div class="card-sub" id="mBudgetSub">of — total</div>
+      <div class="card-bar"><div class="card-bar-fill" id="mBudgetBar" style="--bar-color:var(--teal)"></div></div>
+    </div>
+
+    <div class="card card--latency">
+      <div class="card-label"><span class="dot"></span>Latency Used</div>
+      <div class="card-value" id="mLatency">—</div>
+      <div class="card-sub" id="mLatencySub">cap: —</div>
+      <div class="card-bar"><div class="card-bar-fill" id="mLatencyBar" style="--bar-color:var(--blue)"></div></div>
+    </div>
+
+    <div class="card card--local">
+      <div class="card-label"><span class="dot"></span>Routed Local</div>
+      <div class="card-value" id="mLocal">0</div>
+      <div class="card-sub" id="mLocalSub">remote: 0 &nbsp;|&nbsp; queued: 0</div>
+    </div>
+
+    <div class="card card--reject">
+      <div class="card-label"><span class="dot"></span>Rejected</div>
+      <div class="card-value" id="mReject">0</div>
+      <div class="card-sub" id="mRejectSub">FAIL_FAST / rollback</div>
+    </div>
+
+  </div>
+
+  <!-- ── Run Catalogue ── -->
+  <div class="section-header" style="margin-top: 32px;">
+    <div class="section-title">
+      📁 Run Catalogue
+    </div>
+    <span class="event-count" id="runCount">0 runs</span>
+  </div>
+  <div id="runCatalogue">
+    <div class="empty" id="emptyCatalogue"><span>📁</span>No completed runs yet.</div>
+  </div>
+
+  <!-- ── Live log table ── -->
+  <div class="section-header" style="margin-top: 32px;">
+    <div class="section-title">
+      ⚡ Live Inference Stream
+    </div>
+    <span class="event-count" id="eventCount">0 events</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Request ID</th>
+          <th>Tier</th>
+          <th>Route</th>
+          <th>Cost</th>
+          <th>Tokens (In|Out|CR|CW)</th>
+          <th>Latency</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="logBody">
+        <tr><td colspan="8" class="empty"><span>📡</span>Waiting for live events…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const MAX_ROWS = 50;
+  let totalEvents = 0;
+  let rollbackCount = 0;
+  
+  // State for grouping runs
+  let currentRunId = null;
+  const runs = {};
+  let totalRuns = 0;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  function fmt$(n) {
+    if (n == null || isNaN(n)) return '—';
+    return '$' + Number(n).toFixed(6);
+  }
+  function fmtMs(n) {
+    if (n == null || isNaN(n)) return '—';
+    return Number(n).toFixed(1) + 'ms';
+  }
+  function fmtTime(d) {
+    return (d || new Date()).toLocaleTimeString('en-GB', { hour12: false });
+  }
+  function pct(used, max) {
+    if (!max) return 0;
+    return Math.min(100, (used / max) * 100);
+  }
+
+  // ── Metric card updaters ─────────────────────────────────────────────────
+
+  function updateCards(data) {
+    const counts = data.route_counts || {};
+
+    // Budget
+    if (data.budget_max != null) {
+      const remaining = data.budget_remaining ?? 0;
+      const spent = data.budget_spent ?? 0;
+      document.getElementById('mBudget').textContent = fmt$(remaining);
+      document.getElementById('mBudgetSub').textContent = `$${Number(spent).toFixed(6)} spent of $${Number(data.budget_max).toFixed(4)}`;
+      document.getElementById('mBudgetBar').style.width = pct(remaining, data.budget_max) + '%';
+    }
+
+    // Latency
+    if (data.latency_max_ms != null) {
+      const committed = data.latency_committed_ms ?? 0;
+      const cap = data.latency_max_ms;
+      document.getElementById('mLatency').textContent = fmtMs(committed);
+      document.getElementById('mLatencySub').textContent = `cap: ${fmtMs(cap)}`;
+      const usedPct = pct(committed, cap);
+      const bar = document.getElementById('mLatencyBar');
+      bar.style.width = usedPct + '%';
+      bar.style.setProperty('--bar-color', usedPct > 80 ? 'var(--red)' : usedPct > 50 ? 'var(--amber)' : 'var(--blue)');
+    }
+
+    // Route counts
+    const local  = (counts.LOCAL  ?? 0) + (counts.QUEUE_LOCAL ?? 0);
+    const remote = counts.REMOTE ?? 0;
+    const queued = counts.QUEUE_LOCAL ?? 0;
+    const fail   = counts.FAIL_FAST ?? 0;
+    document.getElementById('mLocal').textContent  = local;
+    document.getElementById('mLocalSub').textContent = `remote: ${remote} | queued: ${queued}`;
+    document.getElementById('mReject').textContent = fail + rollbackCount;
+  }
+
+  // ── Route badge markup ────────────────────────────────────────────────────
+
+  function routeBadge(route) {
+    const safe = (route || 'UNKNOWN').replace(/[^A-Z_]/g, '');
+    return `<span class="badge badge-${safe}">${safe}</span>`;
+  }
+
+  function statusBadge(outcome, event) {
+    if (event === 'fail_fast')    return '<span class="badge badge-err">FAIL_FAST</span>';
+    if (event === 'rollback_event') return '<span class="badge badge-err">ROLLBACK</span>';
+    if (!outcome) return '<span class="badge badge-warn">PENDING</span>';
+    if (outcome === 'committed' || outcome === 'fallback_local')
+      return '<span class="badge badge-ok">OK</span>';
+    return `<span class="badge badge-warn">${outcome.toUpperCase()}</span>`;
+  }
+
+  function tierSpan(tier) {
+    if (!tier || tier === 'UNKNOWN') return '<span style="color:var(--text-muted)">—</span>';
+    return `<span class="tier-${tier}">${tier}</span>`;
+  }
+
+  // ── Row insertion ─────────────────────────────────────────────────────────
+
+  const requestInfo = {}; // maps request_id -> { route, tier }
+
+  function addRow(payload) {
+    const tbody = document.getElementById('logBody');
+
+    // Remove empty-state row
+    const empty = tbody.querySelector('.empty');
+    if (empty) empty.closest('tr').remove();
+
+    const isRollback = payload.event === 'rollback_event';
+    const isFail     = payload.event === 'fail_fast';
+
+    // Track request info on route_decision
+    if (payload.event === 'route_decision') {
+      requestInfo[payload.request_id] = {
+        route: payload.route,
+        tier: payload.complexity_tier,
+        prompt: payload.prompt
+      };
+    }
+
+    const info = requestInfo[payload.request_id] || {};
+    const route   = payload.route || info.route || (isFail ? 'FAIL_FAST' : '—');
+    const tier    = tierSpan(payload.complexity_tier || info.tier);
+    const cost    = payload.actual_cost != null ? fmt$(payload.actual_cost) : '—';
+    const latency = payload.actual_latency_ms != null ? fmtMs(payload.actual_latency_ms) : '—';
+    
+    let tokensHtml = '—';
+    if (payload.prompt_tokens !== undefined) {
+      const pt = payload.prompt_tokens;
+      const ct = payload.completion_tokens || 0;
+      const cr = payload.cache_read_tokens || 0;
+      const cw = payload.cache_write_tokens || 0;
+      tokensHtml = `<span style="font-size: 10px; opacity: 0.8;">${pt} | ${ct} | ${cr} | ${cw}</span>`;
+    }
+
+    // Update existing row if present, else create new
+    let tr = document.getElementById('row-' + payload.request_id);
+    if (!tr) {
+      tr = document.createElement('tr');
+      tr.id = 'row-' + payload.request_id;
+      tbody.insertBefore(tr, tbody.firstChild);
+    }
+
+    if (isRollback) tr.classList.add('row-rollback');
+
+    const promptTooltip = info.prompt ? `title="${info.prompt.replace(/"/g, '&quot;')}" style="cursor: help; text-decoration: underline dotted var(--text-dim);"` : '';
+    const rowTime = fmtTime();
+
+    const rowHtml = `
+      <td class="dim">${rowTime}</td>
+      <td ${promptTooltip}>${payload.request_id || '—'}</td>
+      <td>${tier}</td>
+      <td>${routeBadge(route)}</td>
+      <td class="dim">${cost}</td>
+      <td class="dim">${tokensHtml}</td>
+      <td class="dim">${latency}</td>
+      <td>${statusBadge(payload.outcome, payload.event)}</td>
+    `;
+    tr.innerHTML = rowHtml;
+
+    totalEvents++;
+    document.getElementById('eventCount').textContent = `${totalEvents} events`;
+    
+    // Also save to current run if active
+    if (currentRunId && runs[currentRunId]) {
+      // Find if we already have this request in the run events
+      const evs = runs[currentRunId].events;
+      const existingIdx = evs.findIndex(e => e.req_id === payload.request_id);
+      
+      const rowData = {
+        req_id: payload.request_id,
+        html: rowHtml,
+        isRollback: isRollback
+      };
+      
+      if (existingIdx >= 0) {
+        evs[existingIdx] = rowData; // update
+      } else {
+        evs.push(rowData); // insert
+      }
+    }
+  }
+
+  // ── Run Catalogue ─────────────────────────────────────────────────────────
+
+  function toggleRunDetails(runId) {
+    const el = document.getElementById(`run-details-${runId}`);
+    if (el) el.classList.toggle('expanded');
+  }
+
+  function toggleRunEvents(runId, e) {
+    e.stopPropagation();
+    const el = document.getElementById(`run-events-${runId}`);
+    if (el) el.classList.toggle('expanded');
+  }
+
+  function buildRunCard(runId, runData) {
+    const v = runData.verdict;
+    const m = runData.metrics;
+    
+    const isPass = v === 'PASS';
+    const vBadge = isPass ? '<span class="badge badge-ok">PASS</span>' : '<span class="badge badge-err">FAIL</span>';
+    
+    // Basic stats for header
+    const cost = fmt$(m.cumulative_remote_cost);
+    const rem = fmt$(m.remaining_remote_budget);
+    const lat = fmtMs(m.cumulative_actual_latency_ms);
+    const local = m.active_local_inferences || 0;
+    const ts = fmtTime(new Date(runData.timestamp));
+
+    let eventsHtml = '';
+    for (const ev of runData.events.reverse()) { // reverse to show latest at top like live stream
+      eventsHtml += `<tr class="${ev.isRollback ? 'row-rollback' : ''}">${ev.html}</tr>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'run-card';
+    card.innerHTML = `
+      <div class="run-header" onclick="toggleRunDetails('${runId}')">
+        <div class="run-header-title">
+          <span>${runId}</span>
+          ${vBadge}
+        </div>
+        <div class="run-header-stats">
+          <span title="Completed At">🕒 <strong>${ts}</strong></span>
+          <span title="Cost Spent">💸 <strong>${cost}</strong></span>
+          <span title="Cumulative Latency">⏱ <strong>${lat}</strong></span>
+          <span title="Remaining Budget">💰 <strong>${rem}</strong></span>
+        </div>
+      </div>
+      <div class="run-details" id="run-details-${runId}">
+        <div class="run-metrics-grid">
+          <div class="run-metric">
+            <div class="run-metric-label">Remote Cost Spent</div>
+            <div class="run-metric-value">${cost}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Remaining Budget</div>
+            <div class="run-metric-value">${rem}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Reserved Budget (Leak)</div>
+            <div class="run-metric-value">${fmt$(m.reserved_remote_budget)}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Cumulative Latency</div>
+            <div class="run-metric-value">${lat}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Reserved Latency (Leak)</div>
+            <div class="run-metric-value">${fmtMs(m.reserved_latency_ms)}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Active Local (Leak)</div>
+            <div class="run-metric-value">${local} / ${m.max_local_concurrency}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Local Latency EMA</div>
+            <div class="run-metric-value">${fmtMs(m.local_latency_ema_ms)}</div>
+          </div>
+          <div class="run-metric">
+            <div class="run-metric-label">Remote Latency EMA</div>
+            <div class="run-metric-value">${fmtMs(m.remote_latency_ema_ms)}</div>
+          </div>
+        </div>
+        
+        <button class="toggle-events-btn" onclick="toggleRunEvents('${runId}', event)">
+          Show Inference Events (${runData.events.length})
+        </button>
+        
+        <div class="run-events" id="run-events-${runId}">
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Request ID</th>
+                <th>Tier</th>
+                <th>Route</th>
+                <th>Cost</th>
+                <th>Tokens</th>
+                <th>Latency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${eventsHtml || '<tr><td colspan="8" class="empty" style="padding: 20px 0;">No events captured during this run.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+    return card;
+  }
+
+  // ── Partial card update from an SSE event ─────────────────────────────────
+
+  function patchCardsFromEvent(payload) {
+    // Budget remaining
+    if (payload.budget_remaining != null) {
+      const budgetMax = parseFloat(document.getElementById('mBudgetSub').textContent.match(/\$([\d.]+)$/) ?.[1]) || 0.10;
+      document.getElementById('mBudget').textContent = fmt$(payload.budget_remaining);
+      document.getElementById('mBudgetBar').style.width = pct(payload.budget_remaining, budgetMax) + '%';
+    }
+
+    // Rollback counter
+    if (payload.event === 'rollback_event') {
+      rollbackCount++;
+    }
+
+    // Fail count (incremented on route_decision for FAIL_FAST)
+    // Note: route_counts are tracked server-side and refreshed via /summary;
+    // here we just do a lightweight local increment for the rejected card.
+    if (payload.event === 'fail_fast' || payload.event === 'rollback_event') {
+      const el = document.getElementById('mReject');
+      el.textContent = parseInt(el.textContent || '0', 10) + 1;
+    }
+  }
+
+  // ── Initial summary load ──────────────────────────────────────────────────
+
+  async function loadSummary() {
+    try {
+      const res = await fetch('/summary');
+      if (!res.ok) return;
+      const data = await res.json();
+      updateCards(data);
+    } catch (e) {
+      console.warn('Summary fetch failed:', e);
+    }
+  }
+
+  // Refresh summary every 5 s so route counts stay in sync
+  setInterval(loadSummary, 5000);
+
+  // ── SSE connection ────────────────────────────────────────────────────────
+
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+
+  function connect() {
+    const es = new EventSource('/events');
+
+    es.onopen = () => {
+      dot.className  = 'status-dot live';
+      text.textContent = 'Streaming live';
+      loadSummary();
+    };
+
+    es.onmessage = (e) => {
+      let payload;
+      try { payload = JSON.parse(e.data); } catch { return; }
+
+      // Skip infrastructure events
+      if (!payload.event || payload.event === 'connected') return;
+      
+      // Run Tracking
+      if (payload.event === 'run_start') {
+        currentRunId = payload.run_id;
+        runs[currentRunId] = { events: [], timestamp: Date.now() };
+        return;
+      }
+      
+      if (payload.event === 'run_complete') {
+        if (!currentRunId || currentRunId !== payload.run_id) return; // ignore out of order
+        
+        runs[currentRunId].verdict = payload.verdict;
+        runs[currentRunId].metrics = payload.metrics;
+        runs[currentRunId].routes = payload.routes;
+        
+        const cat = document.getElementById('runCatalogue');
+        const empty = document.getElementById('emptyCatalogue');
+        if (empty) empty.remove();
+        
+        const card = buildRunCard(currentRunId, runs[currentRunId]);
+        cat.insertBefore(card, cat.firstChild);
+        
+        totalRuns++;
+        document.getElementById('runCount').textContent = `${totalRuns} runs`;
+        
+        currentRunId = null; // Wait for next run
+        return;
+      }
+
+      // Only add visible rows for actionable events
+      const visible = ['route_decision', 'execution_complete', 'fail_fast', 'rollback_event'];
+      if (visible.includes(payload.event)) {
+        addRow(payload);
+        patchCardsFromEvent(payload);
+      }
+    };
+
+    es.onerror = () => {
+      dot.className  = 'status-dot error';
+      text.textContent = 'Reconnecting…';
+      es.close();
+      setTimeout(connect, 3000);
+    };
+  }
+
+  connect();
+</script>
+</body>
+</html>
